@@ -14,6 +14,7 @@ async function wait(fn,label){for(let i=0;i<100;i++){const result=await fn();if(
 try {
   await once(ws,'open');ws.send(JSON.stringify({type:'start',protocolVersion:1,token:created.recorderToken,audio:{format:'pcm_s16le',sampleRate:16000,channels:1,bitsPerSample:16}}))
   await wait(()=>messages.some(m=>m.type==='ready'),'ready')
+  assert.equal((await session.api(`/meetings/${id}/transcription/start`,'POST')).status,200);
   ws.send(encodeAudioFrame(new ArrayBuffer(32000),0,0));await wait(()=>messages.some(m=>m.type==='ack'),'ack')
   if(separates && ['SONIOX','TENCENT','DOUBAO'].includes(process.env.TEST_PROVIDER)) {
     const live=await wait(async()=>{const d=(await session.api(`/meetings/${id}`)).body;return d.segments?.[0]?.text==='项目' && d.speakers?.length===1?d:false},'live speaker before stop');

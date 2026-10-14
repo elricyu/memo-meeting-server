@@ -20,13 +20,13 @@
 1. 网页用户登录，或眼镜完成硬件绑定；记录端使用登录 Cookie/设备 Bearer 凭证通过 POST 创建会议，拿到会议 ID 和可选录音凭证。
 2. 查看端 GET 列表，或订阅列表 SSE；创建完成的 WAITING 会议立即出现。
 3. 记录端打开音频 WebSocket，发送 start 握手。
-4. 后端确认权限、独占录音会话及云端 task-started 后返回 ready。
-5. 记录端读取 ready.offsetBytes，按顺序发送 MM01 音频帧。后端保存并转发到云端。
+4. 后端确认权限、独占录音会话后返回 ready（录音默认不连接云端识别）。
+5. 记录端读取 ready.offsetBytes，按顺序发送 MM01 音频帧。后端保存音频；用户主动开启实时转录后才转发新增音频到云端。
 6. 查看端独立订阅详情 SSE，获取实时草稿与已确认句子，不参与音频上传。
 7. 记录端 flush 最后一个短帧，发送 stop，保持连接，等待 finished。
 8. 后端收到云端最后一句和 task-finished 后刷盘、保存 COMPLETED 并返回 finished。
 
-没有云端 Key 时 config.asrReady=false，创建记录仍可用；开始录音明确拒绝，不返回虚假转录。
+没有云端 Key 时 config.asrReady=false，创建记录仍可用；录音可正常保存；主动转录明确拒绝，不返回虚假转录。
 
 ## 3. 创建会议
 
@@ -137,7 +137,7 @@ ack 表示这些 PCM 已完成文件 fsync 和数据库字节数更新，不表�
 { "type": "finished", "sessionId": "<UUID>", "committedBytes": 35200, "message": "" }
 ```
 
-最后一次 ack 与 finished 在最终刷盘后发送，随后正常关闭 WebSocket。不要在 stop 后立即关闭连接。尾句确认上限 25 秒；超时为 INTERRUPTED，可用已保存音频重新转录。音频为空时不发送 ack，finished 的 committedBytes 为 0。
+最后一次 ack 与 finished 在最终刷盘后发送，随后正常关闭 WebSocket。不要在 stop 后立即关闭连接。尾句确认上限 25 秒；转录尾句失败不影响音频完成保存，可用已保存音频重新转录。音频为空时不发送 ack，finished 的 committedBytes 为 0。
 
 错误：`{"type":"error","code":"INVALID_PROTOCOL|RECORDING_REJECTED|RECORDING_INTERRUPTED","message":"可显示给用户的原因"}`。已开始的会话错误通常附带 sessionId/committedBytes；关闭码 1008 表示协议/权限拒绝。成功完成关闭码 1000。云端服务异常会明确中断，不自动重试云端付费任务。
 
@@ -251,3 +251,7 @@ POST `/api/v1/meetings/{id}/summary` 仍异步执行。最终 AI 请求同时生
 记录端停止后，后端等待 ASR 最终结果和 WAV 落盘，再由正常录音完成事件启动纪要与标题任务。网页和已绑定眼镜均适用，不依赖查看端在线或用户登录上下文；配置依据会议 ownerId 读取。`meeting.status=COMPLETED` 与 `summaryStatus=RUNNING` 可以同时存在。此时查看端保持有限 SSE，收到 DONE/FAILED 后恢复静态详情。重复完成事件不会重复收费调用，正常 STOP 以外的断线、撤销、服务重启、重新转录不自动触发。
 
 纪要服务未配置或无确认原文时保留标题和录音，标记纪要失败并说明原因。任务失败可手动 POST summary 重试；成功后也可重新生成。系统不会在启动时批量为历史会议生成纪要。
+
+## 按需转录
+
+录音、详情 GET 和 SSE 订阅不触发识别费用。登录用户主动调用 `POST /api/v1/meetings/{id}/transcription/start`，仅会议 `RECORDING` 时允许；设备身份不能开启，重复开启返回409。仅识别开启后的音频，时间戳保留完整录音偏移。Detail 提供 `transcribing`、`transcriptionStarting`、`transcriptionError`。转录故障继续保存录音；停止、断线或续录后默认关闭。结束后主动调用现有 `retranscribe` 接口处理完整音频，网页按钮为「转录」。未产生文字的正常停止不自动生成纪要。

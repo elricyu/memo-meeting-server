@@ -3801,6 +3801,118 @@
         },
         "x-csrf-required": true
       }
+    },
+    "/meetings/{id}/transcription/start": {
+      "post": {
+        "summary": "用户主动开启进行中会议的实时转录，仅识别开启后的音频",
+        "operationId": "post_meetings_id_transcription_start",
+        "tags": [
+          "meetings"
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求频率超限",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "输入错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "录音凭证错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态、并发或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "内部错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "云端服务未配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -4146,7 +4258,10 @@
         "required": [
           "meeting",
           "segments",
-          "draft"
+          "draft",
+          "transcribing",
+          "transcriptionStarting",
+          "transcriptionError"
         ],
         "properties": {
           "meeting": {
@@ -4167,6 +4282,15 @@
             "items": {
               "$ref": "#/components/schemas/Speaker"
             }
+          },
+          "transcribing": {
+            "type": "boolean"
+          },
+          "transcriptionStarting": {
+            "type": "boolean"
+          },
+          "transcriptionError": {
+            "type": "string"
           }
         }
       },

@@ -32,7 +32,7 @@ const ws=new WebSocket(`${base.replace('http','ws')}/ws/v1/meetings/${id}/audio`
 const messages=[];ws.on('message',data=>messages.push(JSON.parse(data)))
 await once(ws,'open');ws.send(JSON.stringify({type:'start',protocolVersion:1,audio:{format:'pcm_s16le',sampleRate:16000,channels:1,bitsPerSample:16}}))
 for(let i=0;i<100 && !messages.some(m=>m.type==='ready');i++)await new Promise(r=>setTimeout(r,100))
-assert.ok(messages.some(m=>m.type==='ready'));ws.send(encodeAudioFrame(new ArrayBuffer(32000),0,0))
+assert.ok(messages.some(m=>m.type==='ready'));assert.equal((await native(base,`/meetings/${id}/transcription/start`,'POST',undefined,token)).status,403);assert.equal((await bob.api(`/meetings/${id}/transcription/start`,'POST')).status,404);assert.equal((await alice.api(`/meetings/${id}`)).body.transcribing,false);ws.send(encodeAudioFrame(new ArrayBuffer(32000),0,0))
 for(let i=0;i<100 && !messages.some(m=>m.type==='ack');i++)await new Promise(r=>setTimeout(r,100))
 assert.ok(messages.some(m=>m.type==='ack'))
 const deviceStreamAbort = new AbortController()
@@ -58,7 +58,7 @@ const completedId=later.body.meeting.id,normal=new WebSocket(`${base.replace('ht
 normal.on('message',data=>normalMessages.push(JSON.parse(data)));
 async function wait(fn,label){for(let i=0;i<100;i++){if(await fn())return;await new Promise(r=>setTimeout(r,100))}throw new Error(label)}
 await once(normal,'open');normal.send(JSON.stringify({type:'start',protocolVersion:1,audio:{format:'pcm_s16le',sampleRate:16000,channels:1,bitsPerSample:16}}));
-await wait(()=>normalMessages.some(m=>m.type==='ready'),'device ready');normal.send(encodeAudioFrame(new ArrayBuffer(32000),0,0));
+await wait(()=>normalMessages.some(m=>m.type==='ready'),'device ready');assert.equal((await bob.api(`/meetings/${completedId}/transcription/start`,'POST')).status,200);normal.send(encodeAudioFrame(new ArrayBuffer(32000),0,0));
 await wait(()=>normalMessages.some(m=>m.type==='ack'),'device audio saved');normal.send(JSON.stringify({type:'stop'}));
 await wait(()=>normalMessages.some(m=>m.type==='finished'),'device finished');
 await wait(async()=>(await bob.api(`/meetings/${completedId}`)).body.meeting.summaryStatus==='DONE','automatic device summary');

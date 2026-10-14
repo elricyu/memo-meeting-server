@@ -17,13 +17,14 @@ async function waitFor(fn, label) {
   throw new Error(`Timed out: ${label}`)
 }
 async function create(title, context = '') { const response = await api('/meetings', 'POST', { title, context }); assert.equal(response.status, 200); return response.body }
-async function recorder(id, token, versioned = true) {
+async function recorder(id, token, versioned = true, transcribe = true) {
   const socket = new WebSocket(versioned ? `${wsBase}/ws/v1/meetings/${id}/audio` : `${wsBase}/ws/record/${id}`, { headers: { Cookie: session.cookie() } })
   const messages = []
   socket.on('message', data => messages.push(JSON.parse(data)))
   await once(socket, 'open'); socket.send(JSON.stringify({ type: 'start', token, ...(versioned ? { protocolVersion: 1, audio: { format: 'pcm_s16le', sampleRate: 16000, channels: 1, bitsPerSample: 16 } } : {}) }))
   await waitFor(() => messages.find(m => m.type === 'ready' || m.type === 'error'), 'recorder handshake')
   const ready = messages.find(m => m.type === 'ready')
+  if(ready && transcribe) assert.equal((await api(`/meetings/${id}/transcription/start`, 'POST')).status,200)
   let seq = 0, offset = ready?.offsetBytes || 0
   const sendAudio = (size = 3200) => { const pcm = new ArrayBuffer(size); socket.send(versioned ? encodeAudioFrame(pcm, seq++, offset) : pcm); offset += size }
   return { socket, messages, sendAudio }
@@ -51,6 +52,29 @@ assert.equal((await api('/meetings', 'POST', { title: '缺少凭证', clientRequ
 assert.equal((await api('/meetings/missing/transcript')).status, 404)
 assert.equal((await api('/meetings/missing/events')).status, 404)
 assert.equal((await api('/meetings', 'POST', { title: '来源错误', source: 'BAD' })).status, 400)
+// Recording and viewing alone must not activate paid transcription.
+const manual = await create('默认只录音');
+assert.equal((await api(`/meetings/${manual.meeting.id}/transcription/start`,'POST')).status,409)
+const quiet = await recorder(manual.meeting.id,manual.recorderToken,true,false);
+quiet.sendAudio(32000);
+await waitFor(()=>quiet.messages.some(m=>m.type==='ack'),'audio saved without ASR');
+let quietDetail=await snapshot(manual.meeting.id);
+assert.equal(quietDetail.transcribing,false);assert.equal(quietDetail.draft,'');assert.equal(quietDetail.segments.length,0);
+assert.equal((await api(`/meetings/${manual.meeting.id}/transcription/start`,'POST')).status,200);
+assert.equal((await api(`/meetings/${manual.meeting.id}/transcription/start`,'POST')).status,409);
+quiet.sendAudio(32000);
+await waitFor(async()=>(await snapshot(manual.meeting.id)).draft,'manual realtime text');
+quiet.socket.send(JSON.stringify({type:'stop'}));await waitFor(()=>quiet.messages.some(m=>m.type==='finished'),'manual stop');
+await waitFor(async()=>(await snapshot(manual.meeting.id)).meeting.summaryStatus==='DONE','manual summary');
+assert.equal((await snapshot(manual.meeting.id)).segments[0].startMs,32000/32);
+assert.equal((await api(`/meetings/${manual.meeting.id}/transcription/start`,'POST')).status,409);
+const archive=await create('未转录录音');const only=await recorder(archive.meeting.id,archive.recorderToken,true,false);
+only.sendAudio(32000);await waitFor(()=>only.messages.some(m=>m.type==='ack'),'archive saved');
+only.socket.send(JSON.stringify({type:'stop'}));await waitFor(()=>only.messages.some(m=>m.type==='finished'),'archive stopped');
+quietDetail=await snapshot(archive.meeting.id);assert.equal(quietDetail.segments.length,0);assert.equal(quietDetail.meeting.summaryStatus,'IDLE');
+assert.equal((await api(`/meetings/${archive.meeting.id}/retranscribe`,'POST')).status,200);
+await waitFor(async()=>(await snapshot(archive.meeting.id)).meeting.status==='COMPLETED','manual archive transcription');
+assert.ok((await snapshot(archive.meeting.id)).segments.length);
 const list = await eventStream('/events')
 const summaryCreation = { title: '跨设备实时转录集成测试', source: 'WEB', clientRequestId: randomUUID(), recorderToken: randomBytes(32).toString('hex') }
 const created = (await api('/meetings', 'POST', summaryCreation)).body
@@ -113,7 +137,9 @@ assert.equal(result.meeting.audioBytes, 6400); assert.equal(result.segments[0].s
 const failure = await create('云端失败音频保留测试', 'FAIL_ASR_TEST')
 const fail = await recorder(failure.meeting.id, failure.recorderToken)
 fail.sendAudio()
-await waitFor(async () => (await snapshot(failure.meeting.id)).meeting.status === 'INTERRUPTED', 'cloud failure explicit')
+await waitFor(async () => !!(await snapshot(failure.meeting.id)).transcriptionError, 'cloud failure does not stop recording')
+assert.equal((await snapshot(failure.meeting.id)).meeting.status,'RECORDING')
+fail.socket.send(JSON.stringify({type:'stop'}));await waitFor(()=>fail.messages.some(m=>m.type==='finished'),'save after cloud failure')
 assert.equal((await snapshot(failure.meeting.id)).meeting.audioBytes, 3200)
 const original = (await snapshot(failure.meeting.id)).segments
 await api(`/meetings/${failure.meeting.id}/retranscribe`, 'POST', undefined, failure.recorderToken)

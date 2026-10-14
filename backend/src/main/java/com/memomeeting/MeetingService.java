@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MeetingService {
     public record RecordingCompleted(String id) {}
     private final org.springframework.context.ApplicationEventPublisher completionEvents;
-    public record Detail(Store.Meeting meeting, List<Store.Segment> segments, String draft,List<Store.Speaker> speakers) {}
+    public record Detail(Store.Meeting meeting, List<Store.Segment> segments, String draft,List<Store.Speaker> speakers,boolean transcribing,boolean transcriptionStarting,String transcriptionError) {}
     private final Store store;
     private final AudioFiles files;
     private final Events events;
@@ -38,7 +38,7 @@ public class MeetingService {
             files.finalizeFile(id);store.audioBytes(id,files.bytes(id));
         }
     }
-    public Detail detail(String id){return new Detail(store.get(id),store.segments(id),drafts.getOrDefault(id,""),store.speakers(id));}
+    public Detail detail(String id){var r=recordings.get(id);return new Detail(store.get(id),store.segments(id),drafts.getOrDefault(id,""),store.speakers(id),r!=null && r.cloud!=null,r!=null && r.transcriptionStarting,r==null?"":r.transcriptionError);}
     public void changed(String id){events.publish(id,"snapshot",detail(id));var owner=store.get(id).ownerId();if(owner!=null)events.publish("user:"+owner,"changed",Map.of("id",id));}
     public void start(String id,String token,WebSocketSession socket) throws Exception {
         start(id,token,socket,false);
@@ -49,8 +49,6 @@ public class MeetingService {
     public void start(String id,String token,WebSocketSession socket,boolean versioned,Identity identity) throws Exception {
         access.meeting(id,identity);
         if(token!=null && !token.isBlank() && !store.authorized(id,token))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"录音凭证错误");
-        var config=ai.resolve(identity.userId(),"asr");
-        if(!config.ready()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"请先在 AI 设置中配置语音识别 Key");
         if(!busy.add(id)) throw new ResponseStatusException(HttpStatus.CONFLICT,"已有设备正在录音或处理");
         var meeting=store.get(id);
         if(!Set.of("WAITING","INTERRUPTED","FAILED").contains(meeting.status()) || meeting.summaryStatus().equals("RUNNING")) {
@@ -62,14 +60,6 @@ public class MeetingService {
             org.slf4j.LoggerFactory.getLogger(MeetingService.class).info("recording_connecting meeting={} session={} version={}",id,recording.epoch,versioned?1:0);
             store.state(id,"CONNECTING","");changed(id);
             recording.file=files.open(id);recording.bytes=recording.file.length()-44;recording.offset=recording.bytes/32;recording.checkpointBytes=recording.bytes;
-            var connected=asr.connect(config,meeting.context(), s->recording.result(s));
-            synchronized(recording) {
-                if(recording.closed.get()) {connected.abort();throw new IOException("记录端已断开");}
-                recording.cloud=connected;
-            }
-            recording.cloud.done.whenCompleteAsync((v,error)-> {
-                if(!recording.finishing.get() && !recording.closed.get()) recording.fail("云端识别中断，已接收的音频已保存，可继续录音或重新转录。");
-            },workers);
             if(!socket.isOpen() || recording.closed.get()) throw new IOException("记录端已断开");
             synchronized(recording) {
                 if(recording.closed.get()) throw new IOException("识别连接已关闭");
@@ -79,7 +69,7 @@ public class MeetingService {
                     "offsetBytes",recording.bytes,"audioSpec",AudioProtocol.specification()));
             }
         } catch(Exception e) {
-            recording.fail(e instanceof ResponseStatusException ? e.getMessage() : "无法开始识别，请检查云端配置和网络。");
+            recording.fail(e instanceof ResponseStatusException ? e.getMessage() : "无法开始录音，请检查存储和网络。");
             throw e;
         }
     }
@@ -94,7 +84,7 @@ public class MeetingService {
                 bytes=decoded.pcm();
             }
             if(r.identity.device() && !store.deviceActive(r.identity.deviceId(),r.identity.userId())) {r.fail("设备已解绑，录音已停止");return;}
-            if(r.closed.get() || r.finishing.get() || r.cloud==null) throw new IllegalStateException("识别任务尚未就绪");
+            if(r.closed.get() || r.finishing.get()) throw new IllegalStateException("录音任务已结束");
             if(bytes.length==0 || bytes.length>32000 || bytes.length%2!=0) throw new IllegalArgumentException("音频必须为 16kHz 单声道 PCM16");
             if(r.bytes+bytes.length>settings.maxSeconds()*32000) {r.fail("录音已达到时长上限");return;}
             // Save before forwarding so a cloud failure never discards accepted audio.
@@ -104,7 +94,7 @@ public class MeetingService {
                 r.ack();events.publish(id,"progress",Map.of("audioBytes",r.bytes,"durationMs",r.bytes/32));
                 var owner=store.get(id).ownerId();if(owner!=null)events.publish("user:"+owner,"changed",Map.of("id",id));
             }
-            try {r.cloud.audio(bytes);} catch(Exception e){r.fail("云端音频发送失败，已接收音频已保存。");}
+            if(r.cloud!=null) try {r.cloud.audio(bytes);} catch(Exception e){r.transcriptionFailed("实时转录中断，录音继续保存，可稍后转录完整录音。");}
         }
     }
     public void ping(String id,WebSocketSession socket){
@@ -119,8 +109,9 @@ public class MeetingService {
         }
         workers.submit(()-> {
             try {
-                synchronized(r){if(r.closed.get()) return;r.cloud.finish();}
-                r.cloud.done.get(25,TimeUnit.SECONDS);
+                CloudAsr.Session cloud;
+                synchronized(r){if(r.closed.get()) return;cloud=r.cloud;}
+                if(cloud!=null) try {cloud.finish();cloud.done.get(25,TimeUnit.SECONDS);} catch(Exception e){synchronized(r){r.transcriptionFailed("最后一句识别失败，可稍后转录完整录音。");}}
                 r.complete();
             } catch(Exception e){r.fail("最后一句确认失败，音频已保存，可重新转录。");}
         });
@@ -156,6 +147,34 @@ public class MeetingService {
     public void authorize(String id,String token) {
         access.meeting(id);
         if(token!=null && !token.isBlank() && !store.authorized(id,token))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"录音凭证错误");
+    }
+    public void startTranscription(String id) throws Exception {
+        var identity=Access.user();access.meeting(id,identity);
+        var r=recordings.get(id);
+        if(r==null)throw new ResponseStatusException(HttpStatus.CONFLICT,"仅进行中的会议可以开启实时转录");
+        var config=ai.resolve(identity.userId(),"asr");
+        synchronized(r) {
+            if(r.closed.get() || r.finishing.get() || !store.get(id).status().equals("RECORDING"))throw new ResponseStatusException(HttpStatus.CONFLICT,"仅进行中的会议可以开启实时转录");
+            if(r.cloud!=null || r.transcriptionStarting)throw new ResponseStatusException(HttpStatus.CONFLICT,"实时转录已开启或正在连接");
+            if(!config.ready())throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"请先配置语音识别服务");
+            r.transcriptionStarting=true;r.transcriptionError="";changed(id);
+        }
+        final String task=UUID.randomUUID().toString();
+        var enabled=new AtomicBoolean();
+        CloudAsr.Session connected=null;
+        try {
+            connected=asr.connect(config,store.get(id).context(),s->{synchronized(r){if(enabled.get())r.result(task,s);}});
+            synchronized(r) {
+                if(r.closed.get() || r.finishing.get())throw new ResponseStatusException(HttpStatus.CONFLICT,"会议已停止，无法开启实时转录");
+                r.offset=r.bytes/32;r.transcriptionTask=task;r.cloud=connected;r.transcriptionStarting=false;enabled.set(true);changed(id);
+            }
+            final var active=connected;
+            active.done.whenCompleteAsync((v,error)-> {synchronized(r){if(r.cloud==active && !r.finishing.get() && !r.closed.get())r.transcriptionFailed("实时转录中断，录音继续保存，可稍后转录完整录音。");}},workers);
+        } catch(Exception e) {
+            if(connected!=null)connected.abort();
+            synchronized(r){r.transcriptionStarting=false;if(!r.closed.get()){r.transcriptionError="无法开启实时转录，请检查识别服务后重试。";changed(id);}}
+            throw e;
+        }
     }
     public void retranscribe(String id,String token) {
         authorize(id,token);
@@ -198,20 +217,27 @@ public class MeetingService {
         final Identity identity;
         final AtomicBoolean closed=new AtomicBoolean(),finishing=new AtomicBoolean();
         volatile long lastSeen=System.currentTimeMillis();
-        CloudAsr.Session cloud;
+        volatile CloudAsr.Session cloud;
+        volatile boolean transcriptionStarting;
+        String transcriptionTask="";
+        volatile String transcriptionError="";
         RandomAccessFile file;
         long bytes,offset,checkpointBytes,nextSequence;
         Recording(String id,WebSocketSession socket,boolean versioned,Identity identity){this.id=id;this.socket=socket;this.versioned=versioned;this.identity=identity;}
         void ack() {
             if(versioned && nextSequence>0) send(Map.of("type","ack","sessionId",epoch,"sequence",nextSequence-1,"committedBytes",bytes));
         }
-        synchronized void result(JsonNode s) {
-            if(closed.get()) return;
+        synchronized void result(String task,JsonNode s) {
+            if(closed.get() || !task.equals(transcriptionTask)) return;
             var text=s.path("text").asText();
             if(s.path("sentence_end").asBoolean()) {
-                if(!text.isBlank()) store.segment(id,segment(epoch,offset,s));drafts.remove(id);
+                if(!text.isBlank()) store.segment(id,segment(task,offset,s));drafts.remove(id);
             } else drafts.put(id,text);
             events.publish(id,"snapshot",detail(id));
+        }
+        void transcriptionFailed(String message) {
+            var active=cloud;cloud=null;transcriptionTask="";drafts.remove(id);transcriptionError=message;
+            if(active!=null)active.abort();changed(id);
         }
         void send(String type,String message) {
             var value=new HashMap<String,Object>();
@@ -239,7 +265,7 @@ public class MeetingService {
             recordings.remove(id,this);busy.remove(id);changed(id);
             send(status.equals("COMPLETED")?"finished":"error",error);
             try{socket.close(CloseStatus.NORMAL);}catch(IOException | IllegalStateException ignored){ }
-            if(status.equals("COMPLETED"))completionEvents.publishEvent(new RecordingCompleted(id));
+            if(status.equals("COMPLETED") && !store.segments(id).isEmpty())completionEvents.publishEvent(new RecordingCompleted(id));
         }
     }
 }

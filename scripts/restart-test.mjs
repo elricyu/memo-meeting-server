@@ -40,6 +40,7 @@ try {
   const login=await session.api('/auth/login','POST',{username:session.username,password:'explicit-test-password'});assert.equal(login.status,200)
   const recovered=await snapshot(id);assert.equal(recovered.meeting.status,'INTERRUPTED');assert.equal(recovered.meeting.audioBytes,32000)
   const second=await record(id,token);assert.equal(second.messages.find(m=>m.type==='ready').offsetBytes,32000)
+  assert.equal((await snapshot(id)).transcribing,false);assert.equal((await session.api(`/meetings/${id}/transcription/start`,'POST')).status,200)
   second.socket.send(encodeAudioFrame(new ArrayBuffer(3200),0,32000));second.socket.send(JSON.stringify({type:'stop'}))
   await wait(()=>second.messages.some(m=>m.type==='finished'),'resume tail flush')
   const done=await snapshot(id);assert.equal(done.meeting.status,'COMPLETED');assert.equal(done.meeting.audioBytes,35200);assert.equal(done.segments[0].startMs,1000)

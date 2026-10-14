@@ -11,7 +11,7 @@ async function csrfToken(signal: AbortSignal) {
 export type Meeting = { source: string; ownerId: number; deviceId: string | null; id: string; title: string; context: string; status: string; createdAt: string; updatedAt: string; audioBytes: number; error: string; summary: string; summaryStatus: string; summaryError: string }
 export type ListedMeeting = Meeting & { transcriptCount: number }
 export type Segment = { id: string; startMs: number; endMs: number; text: string; speakerId?: string | null }
-export type Detail = { meeting: Meeting; segments: Segment[]; draft: string; speakers: { id: string; name: string }[] }
+export type Detail = { meeting: Meeting; segments: Segment[]; draft: string; speakers: { id: string; name: string }[]; transcribing: boolean; transcriptionStarting: boolean; transcriptionError: string }
 export type Config = { asrReady: boolean; llmReady: boolean; asrModel: string; asrProvider: string; asrCapabilities?: { label: string; partialResults: boolean; speakerMode: string; note: string }; diarization: boolean; maxSeconds: number }
 export async function request<T>(path: string, options?: RequestInit, timeoutMs = 15000): Promise<T> {
   const controller = new AbortController()
@@ -31,5 +31,5 @@ export async function request<T>(path: string, options?: RequestInit, timeoutMs 
 }
 export function recorderToken(id: string) { return localStorage.getItem(`memo-recorder-${id}`) || '' }
 export function action(id: string, name: string) { return request(`/meetings/${id}/${name}`, { method: 'POST', headers: { 'X-Recorder-Token': recorderToken(id) } }) }
-export const statusNames: Record<string, string> = { WAITING: '待录音', CONNECTING: '连接中', RECORDING: '录音中', FINALIZING: '确认最后一句', COMPLETED: '已完成', INTERRUPTED: '已中断', FAILED: '保存失败', REPROCESSING: '重新转录中' }
+export const statusNames: Record<string, string> = { WAITING: '待录音', CONNECTING: '连接中', RECORDING: '录音中', FINALIZING: '保存中', COMPLETED: '已完成', INTERRUPTED: '已中断', FAILED: '保存失败', REPROCESSING: '转录中' }
 export function time(ms: number) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}` }

@@ -64,6 +64,7 @@ public class Api {
     @GetMapping(value="/events",produces=MediaType.TEXT_EVENT_STREAM_VALUE) public SseEmitter listEvents(){var identity=Access.user();return events.subscribe("user:"+identity.userId(),()->Map.of("ready",true),Access.actor(identity));}
     @GetMapping(value="/meetings/{id}/events",produces=MediaType.TEXT_EVENT_STREAM_VALUE) public SseEmitter detailEvents(@PathVariable String id){access.meeting(id);return events.subscribe(id,()->meetings.detail(id),Access.actor(Access.current()));}
     @PostMapping("/meetings/{id}/finish") public Object finish(@PathVariable String id,@RequestHeader(value="X-Recorder-Token",required=false) String token){meetings.finishInterrupted(id,token);return meetings.detail(id);}
+    @PostMapping("/meetings/{id}/transcription/start") public Object startTranscription(@PathVariable String id) throws Exception {meetings.startTranscription(id);return meetings.detail(id);}
     @PostMapping("/meetings/{id}/retranscribe") public Object retranscribe(@PathVariable String id,@RequestHeader(value="X-Recorder-Token",required=false) String token){meetings.retranscribe(id,token);return Map.of("accepted",true);}
     @PostMapping("/meetings/{id}/summary") public Object summary(@PathVariable String id,@RequestHeader(value="X-Recorder-Token",required=false) String token){summaries.generate(id,token);return Map.of("accepted",true);}
     @GetMapping("/meetings/{id}/audio") public ResponseEntity<Resource> audio(@PathVariable String id) throws IOException {
