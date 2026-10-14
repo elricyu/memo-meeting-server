@@ -1,0 +1,14 @@
+services:
+  memo-meeting:
+    build: .
+    env_file: .env
+    environment:
+      BIND_ADDRESS: 0.0.0.0
+      DATA_DIR: /data
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - meeting-data:/data
+    restart: unless-stopped
+volumes:
+  meeting-data:

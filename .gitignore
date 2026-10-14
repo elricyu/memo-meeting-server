@@ -1,0 +1,71 @@
+# Dependencies and generated output
+node_modules/
+__pycache__/
+*.py[cod]
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.key
+*.pem
+*.p12
+*.pfx
+*.enc
+# Runtime data and diagnostics
+*.log
+*.pid
+*.wav
+*.pcm
+*.mv.db
+*.trace.db
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+/backend/target/
+/backend/data/
+/backend/src/main/resources/static/
+/frontend/dist/
+/data/
+/data-*/
+/runtime/
+/run/
+/releases/
+/.superdesign/
+# Local task notes and production verification evidence
+/docs/TODO.md
+/docs/runbook/verification-*.md
+
+# Release archives, binary artifacts and local backups
+*.jar
+*.class
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.bak
+*.backup
+*.sqlite
+*.sqlite3
+core
+
+# Device credential material (also excluded from server repository)
+scan-key
+scan-credentials*
+credentials.enc
+
+/dist/
+
+# Operator-specific deployment scripts and internal implementation notes
+/docs/impl/
+/docs/runbook/
+/scripts/run-host.sh
+/scripts/deploy-host.sh
+/scripts/start-production.sh
+/scripts/configure-ai.sh
+/scripts/promote-admin.sh

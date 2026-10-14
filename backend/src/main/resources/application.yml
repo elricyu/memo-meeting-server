@@ -1,0 +1,40 @@
+server:
+  address: ${BIND_ADDRESS:127.0.0.1}
+  port: ${PORT:8090}
+  shutdown: graceful
+  servlet:
+    session:
+      timeout: 24h
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+  error:
+    include-message: never
+spring:
+  datasource:
+    url: jdbc:h2:file:${DATA_DIR:./data}/meeting;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0
+    username: sa
+    password: ${DB_PASSWORD:}
+  sql:
+    init:
+      mode: always
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    async:
+      request-timeout: 0
+memo:
+  admin-username: ${ADMIN_USERNAME:}
+  data-dir: ${DATA_DIR:./data}
+  asr-api-key: ${DASHSCOPE_API_KEY:}
+  asr-url: ${ASR_WS_URL:wss://dashscope.aliyuncs.com/api-ws/v1/inference}
+  asr-model: ${ASR_MODEL:fun-asr-realtime}
+  asr-provider: ${ASR_PROVIDER:DASHSCOPE}
+  vocabulary-id: ${ASR_VOCABULARY_ID:}
+  llm-api-key: ${LLM_API_KEY:${DASHSCOPE_API_KEY:}}
+  llm-url: ${LLM_URL:https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions}
+  llm-model: ${LLM_MODEL:qwen-plus}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:8090,http://127.0.0.1:8090}
+  max-seconds: ${MAX_RECORDING_SECONDS:14400}
