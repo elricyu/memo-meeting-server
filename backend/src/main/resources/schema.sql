@@ -82,3 +82,9 @@ CREATE TABLE IF NOT EXISTS global_ai_configs (
  reuse_asr_key BOOLEAN NOT NULL DEFAULT FALSE, key_cipher VARCHAR(4096) NOT NULL DEFAULT '',
  updated_by BIGINT NOT NULL REFERENCES users(id), updated_at VARCHAR(40) NOT NULL
 );
+
+-- A database lock serializes pairing allocation/consumption through transaction commit.
+CREATE TABLE IF NOT EXISTS pairing_lock (id INT PRIMARY KEY);
+MERGE INTO pairing_lock KEY(id) VALUES(1);
+ALTER TABLE pairings ALTER COLUMN code DROP NOT NULL;
+CREATE TABLE IF NOT EXISTS pairing_code_reservations (code VARCHAR(4) PRIMARY KEY, available_after BIGINT NOT NULL);

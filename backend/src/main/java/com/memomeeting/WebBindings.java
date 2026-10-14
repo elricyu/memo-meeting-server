@@ -62,11 +62,11 @@ public class WebBindings {
         for(var row:rows){
             if(token!=null && clientId.equals(row.get("CLIENT_ID")) && mac.equals(row.get("MAC")) && Devices.hash(token).equals(row.get("TOKEN_HASH"))){
                 String state=(String)row.get("STATUS");
-                return Map.of("state",state,"message",state.equals("BOUND")?"已绑定，可打开会议记录":"请在网页确认绑定");
+                return Map.of("state",state,"message",state.equals("BOUND")?"已绑定，可打开会议记录":"请在网页绑定眼镜并输入验证码");
             }
         }
-        if(!rows.isEmpty())return Map.of("state","REBIND_REQUIRED","message","当前凭证不可用，请在原账号解绑旧设备或取消待确认申请，再打开系统绑定二维码扫码");
-        return Map.of("state","UNBOUND","message","当前设备未绑定，请打开系统里的绑定二维码，让眼镜扫码");
+        if(!rows.isEmpty())return Map.of("state","REBIND_REQUIRED","message","当前凭证不可用，请在原账号解绑旧设备或取消待确认申请，再打开会议记录获取验证码");
+        return Map.of("state","UNBOUND","message","当前设备未绑定，请在网页输入眼镜播报的验证码");
     }
     @Transactional public synchronized void cancel(String id,long user){
         var row=owned(id,user);

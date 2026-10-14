@@ -29,6 +29,7 @@ for _ in {1..100}; do
 done
 if [[ "$ready" != 1 ]]; then cat "$test_root/server.log"; exit 1; fi
 TEST_URL="http://127.0.0.1:$app_port" node scripts/integration.mjs | tee "$test_root/result.log"
+TEST_URL="http://127.0.0.1:$app_port" node scripts/code-binding-integration.mjs | tee -a "$test_root/result.log"
 TEST_URL="http://127.0.0.1:$app_port" node scripts/device-integration.mjs | tee -a "$test_root/result.log"
 TEST_URL="http://127.0.0.1:$((app_port + 1))" RESTART_DATA_DIR="$test_root/restart-data" \
 DASHSCOPE_API_KEY=explicit-protocol-test-key ASR_WS_URL="ws://127.0.0.1:$mock_port/asr" \
