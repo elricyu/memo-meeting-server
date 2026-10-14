@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MeetingService {
     public record RecordingCompleted(String id) {}
     private final org.springframework.context.ApplicationEventPublisher completionEvents;
-    public record Detail(Store.Meeting meeting, List<Store.Segment> segments, String draft,List<Store.Speaker> speakers,boolean transcribing,boolean transcriptionStarting,String transcriptionError) {}
+    public record Detail(Store.Meeting meeting, List<Store.Segment> segments, String draft,List<Store.Speaker> speakers,boolean transcribing,boolean transcriptionStarting,String transcriptionError,Map<String,Object> localTranscription) {}
     private final Store store;
     private final AudioFiles files;
     private final Events events;
@@ -38,7 +38,7 @@ public class MeetingService {
             files.finalizeFile(id);store.audioBytes(id,files.bytes(id));
         }
     }
-    public Detail detail(String id){var r=recordings.get(id);return new Detail(store.get(id),store.segments(id),drafts.getOrDefault(id,""),store.speakers(id),r!=null && r.cloud!=null,r!=null && r.transcriptionStarting,r==null?"":r.transcriptionError);}
+    public Detail detail(String id){var r=recordings.get(id);return new Detail(store.get(id),store.segments(id),drafts.getOrDefault(id,""),store.speakers(id),r!=null && r.cloud!=null,r!=null && r.transcriptionStarting,r==null?"":r.transcriptionError,store.localTranscription(id));}
     public void changed(String id){events.publish(id,"snapshot",detail(id));var owner=store.get(id).ownerId();if(owner!=null)events.publish("user:"+owner,"changed",Map.of("id",id));}
     public void start(String id,String token,WebSocketSession socket) throws Exception {
         start(id,token,socket,false);

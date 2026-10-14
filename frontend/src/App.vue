@@ -107,7 +107,7 @@ async function run(name: string) {
   if (!detail.value || submitting.value) return
   const id = detail.value.meeting.id
   submitting.value = true
-  try { await action(id, name); notify(name === 'summary' ? '正在生成纪要' : name === 'retranscribe' ? '已开始转录，完成前保留原文' : name === 'transcription/start' ? '实时转录已开启，将识别接下来的发言' : '记录已结束'); await loadList(); await refreshSelected(id) }
+  try { await action(id, name); notify(name === 'summary' ? '正在生成纪要' : name === 'retranscribe' ? '已开始转录，完成前保留原文' : name === 'local-transcription' ? '本地转录已排队' : name === 'transcription/start' ? '实时转录已开启，将识别接下来的发言' : '记录已结束'); await loadList(); await refreshSelected(id) }
   catch(e) { error.value = (e as Error).message }
   finally { submitting.value = false }
 }
@@ -193,6 +193,7 @@ onUnmounted(() => { listEvents?.close(); detailEvents?.close(); void recorder?.c
             <div v-if="recordingId === detail.meeting.id && !stopping" class="waveform"><span v-for="n in 36" :key="n" :style="{ height: `${5 + level * 30 * (0.3 + Math.abs(Math.sin(n * 1.4)))}px` }"></span><small>正在聆听</small></div>
             <p v-if="detail.meeting.error" class="inline-warning">{{ detail.meeting.error }}</p>
             <div class="detail-tabs"><button :class="{ active: tab === 'transcript' }" @click="tab = 'transcript'"><AudioLines :size="16" />转录原文<span>{{ detail.segments.length }}</span></button><button :class="{ active: tab === 'summary' }" @click="tab = 'summary'"><FileText :size="16" />AI 纪要<span v-if="detail.meeting.summaryStatus === 'DONE'">已生成</span><span v-else-if="detail.meeting.summaryStatus === 'RUNNING'">生成中</span></button><button class="icon-button" aria-label="复制当前文字" @click="copyText"><Copy :size="15" /></button></div>
+            <p v-if="detail.localTranscription?.status" class="inline-warning">本地转录：{{ ({ QUEUED: '排队中', RUNNING: '处理中', RETRY: '等待重试', DONE: '已完成', FAILED: '处理失败', EMPTY: '未检出语音', SKIPPED: '已保留现有记录' } as Record<string,string>)[detail.localTranscription.status] || detail.localTranscription.status }}<span v-if="detail.localTranscription.error"> · {{ detail.localTranscription.error }}</span><button v-if="['FAILED','EMPTY','SKIPPED'].includes(detail.localTranscription.status) && !detail.segments.length" :disabled="submitting" @click="run('local-transcription')">重试本地转录</button></p>
             <p v-if="detail.transcriptionError" class="inline-warning">{{ detail.transcriptionError }}</p>
             <p v-if="detail.segments.length && !detail.speakers.length" class="inline-warning">{{ settled ? '这份记录尚无说话人标签。配置实时分人服务后，可用「转录」补齐。' : '当前识别尚未返回说话人标签。实时分人需要选择支持该能力的服务并启用。' }}<button v-if="currentUser.role === 'ADMIN'" @click="aiModal = true"> 配置实时分人</button></p>
             <div v-if="tab === 'transcript'" ref="transcript" class="transcript" @scroll="trackScroll">

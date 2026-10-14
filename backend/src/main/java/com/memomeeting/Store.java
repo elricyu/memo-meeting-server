@@ -30,6 +30,7 @@ public class Store {
                 r.getLong("audio_bytes"), r.getString("error"), r.getString("summary"),
                 r.getString("summary_status"), r.getString("summary_error"), r.getString("source"), r.getObject("owner_id",Long.class), r.getString("device_id")));
     }
+    public Map<String,Object> localTranscription(String id){return db.query("SELECT status,error FROM local_transcription_jobs WHERE meeting_id=?",(r,n)->Map.<String,Object>of("status",r.getString(1),"error",r.getString(2)),id).stream().findFirst().orElse(Map.of("status","","error",""));}
     public Meeting get(String id) {
         return db.query("SELECT * FROM meetings WHERE id=?", (r, n) ->
             new Meeting(r.getString("id"), r.getString("title"), r.getString("context"),

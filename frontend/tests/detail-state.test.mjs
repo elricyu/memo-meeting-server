@@ -13,3 +13,7 @@ test('summary renders headings and action tables without executing embedded HTML
  assert.ok(html.includes('<h2>待办</h2>'));assert.ok(html.includes('<table>'));
  assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));assert.ok(!html.includes('href="javascript:'));
 });
+test('local queued jobs keep details updated and stop when done',()=>{
+ for(const status of ['QUEUED','RUNNING','RETRY'])assert.equal(detailNeedsLive({...detail('COMPLETED','IDLE',''),localTranscription:{status}}),true);
+ for(const status of ['DONE','FAILED','EMPTY','SKIPPED'])assert.equal(detailNeedsLive({...detail('COMPLETED','IDLE',''),localTranscription:{status}}),false);
+});

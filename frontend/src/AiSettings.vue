@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LocalSpeechSettings from './LocalSpeechSettings.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { X, Check, Radio, FileText, ShieldCheck, LoaderCircle, ArrowUpRight } from 'lucide-vue-next'
 import { request } from './api'
@@ -102,5 +103,6 @@ onMounted(async () => { try { await load() } catch (e) { error.value = (e as Err
       <a v-if="form.provider === 'SONIOX'" class="ai-doc-link" href="https://console.soniox.com" target="_blank" rel="noopener">获取 Soniox Key <ArrowUpRight :size="14" /></a>
       <a v-if="form.provider.startsWith('DASHSCOPE')" class="ai-doc-link" href="https://help.aliyun.com/zh/model-studio/get-api-key" target="_blank" rel="noopener">在百炼控制台获取 Key <ArrowUpRight :size="14" /></a>
     </form>
+    <LocalSpeechSettings @saved="emit('saved')" />
   </section></div>
 </template>

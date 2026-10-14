@@ -32,6 +32,10 @@ class AdminTests {
     @AfterEach void clearContext(){SecurityContextHolder.clearContext();}
     Accounts.User user(String role){var user=accounts.register("ad_"+UUID.randomUUID().toString().replace("-", "").substring(0,12),"角色测试","explicit-test-password");db.update("UPDATE users SET role=? WHERE id=?",role,user.id());return accounts.get(user.id());}
     MockHttpSession session(Accounts.User user,String device){var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(new UsernamePasswordAuthenticationToken(new Identity(user.id(),user.username(),user.displayName(),device),null,List.of()));var session=new MockHttpSession();session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,context);return session;}
+    @Test void localSettingsRequireAdministrator() throws Exception {
+        mvc.perform(get("/api/v1/admin/local-speech").session(session(user("USER"),null))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/local-speech").session(session(user("ADMIN"),null))).andExpect(status().isOk()).andExpect(jsonPath("$.automatic").value(true)).andExpect(jsonPath("$.token").doesNotExist());
+    }
     @Test void meetingListReportsUsableTranscriptCountsWithoutExposingOtherOwners() throws Exception {
         var owner=user("USER");var other=user("USER");
         var identity=new Identity(owner.id(),owner.username(),owner.displayName(),null);

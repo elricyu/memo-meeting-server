@@ -1,0 +1,12 @@
+[Unit]
+Description=Private local speech SSH tunnel
+After=network-online.target
+
+[Service]
+# Replace gpuserver with your SSH config alias. Run on the Memo Meeting server.
+ExecStart=/usr/bin/ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:18192:127.0.0.1:18092 gpuserver
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

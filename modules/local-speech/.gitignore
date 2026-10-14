@@ -1,0 +1,12 @@
+.venv/
+models/
+runtime/
+results/
+__pycache__/
+*.pyc
+.env
+*.wav
+*.flac
+*.mp3
+*.sqlite*
+requirements.lock.txt

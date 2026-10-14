@@ -19,7 +19,7 @@ public class SecretBox {
     public SecretBox(Settings settings, org.springframework.jdbc.core.JdbcTemplate db) throws Exception {
         var path=Path.of(settings.dataDir(),"ai-master.key");Files.createDirectories(path.getParent());
         if(!Files.exists(path)) {
-            var encrypted=db.queryForObject("SELECT (SELECT COUNT(*) FROM global_ai_configs WHERE key_cipher<>'')+(SELECT COUNT(*) FROM ai_configs WHERE key_cipher<>'')",Long.class);
+            var encrypted=db.queryForObject("SELECT (SELECT COUNT(*) FROM global_ai_configs WHERE key_cipher<>'')+(SELECT COUNT(*) FROM ai_configs WHERE key_cipher<>'')+(SELECT COUNT(*) FROM local_speech_config WHERE token_cipher<>'')",Long.class);
             if(encrypted!=null && encrypted>0)throw new IllegalStateException("已有 AI 凭证但缺少 ai-master.key，请恢复原始文件");
             byte[] key=new byte[32];random.nextBytes(key);
             try {

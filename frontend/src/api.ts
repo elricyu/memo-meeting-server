@@ -11,7 +11,7 @@ async function csrfToken(signal: AbortSignal) {
 export type Meeting = { source: string; ownerId: number; deviceId: string | null; id: string; title: string; context: string; status: string; createdAt: string; updatedAt: string; audioBytes: number; error: string; summary: string; summaryStatus: string; summaryError: string }
 export type ListedMeeting = Meeting & { transcriptCount: number }
 export type Segment = { id: string; startMs: number; endMs: number; text: string; speakerId?: string | null }
-export type Detail = { meeting: Meeting; segments: Segment[]; draft: string; speakers: { id: string; name: string }[]; transcribing: boolean; transcriptionStarting: boolean; transcriptionError: string }
+export type Detail = { meeting: Meeting; segments: Segment[]; draft: string; speakers: { id: string; name: string }[]; transcribing: boolean; transcriptionStarting: boolean; transcriptionError: string; localTranscription: { status: string; error: string } }
 export type Config = { asrReady: boolean; llmReady: boolean; asrModel: string; asrProvider: string; asrCapabilities?: { label: string; partialResults: boolean; speakerMode: string; note: string }; diarization: boolean; maxSeconds: number }
 export async function request<T>(path: string, options?: RequestInit, timeoutMs = 15000): Promise<T> {
   const controller = new AbortController()
