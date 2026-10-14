@@ -81,5 +81,5 @@ public class LocalSpeech {
         } catch(Exception e){org.slf4j.LoggerFactory.getLogger(LocalSpeech.class).debug("Local transcription unavailable: {}",e.getClass().getSimpleName());}
         finally {working.set(false);}
     }
-    private void state(String id,String status,String error,long next){db.update("UPDATE local_transcription_jobs SET status=?,error=?,next_try=? WHERE meeting_id=?",status,error,next,id);meetings.changed(id);}
+    private void state(String id,String status,String error,long next){org.slf4j.LoggerFactory.getLogger(LocalSpeech.class).info("local_transcription_status meeting={} status={}",id,status);db.update("UPDATE local_transcription_jobs SET status=?,error=?,next_try=? WHERE meeting_id=?",status,error,next,id);meetings.changed(id);}
 }
