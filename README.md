@@ -2,7 +2,7 @@
 
 开源会议记录服务，包含 Spring Boot 后端和 Vue 网页端。支持浏览器录音，以及配套 RV1106B 开源眼镜应用录音；同一账号可在网页实时查看转录、回听音频、生成和导出会议纪要。
 
-眼镜应用在独立的 `memo-meeting-glasses-client` 仓库维护，不包含在本仓库中。两个仓库通过 [v1 协议](docs/api/protocol-v1.md) 通信，仓库地址将在 GitHub 项目创建后补充。
+眼镜应用在独立的 [memo-meeting-glasses-client](https://github.com/elricyu/memo-meeting-glasses-client) 仓库维护，不包含在本仓库中。两个仓库通过 [v1 协议](docs/api/protocol-v1.md) 通信。
 
 ## 在线使用与自部署
 
@@ -12,7 +12,10 @@
 
 ## 关联项目
 
-配套 `memo-meeting-glasses-client` 运行在 [OpenSource-Ai-Glasses](https://github.com/Iam5tillLearning/OpenSource-Ai-Glasses) 项目的 RV1106B 开源眼镜上。眼镜平台提供固件和 SDK，客户端负责采集与上传音频，本仓库提供后端与网页服务。
+- [memo-meeting-server](https://github.com/elricyu/memo-meeting-server)（本仓库）：后端与 Web。
+- [memo-meeting-glasses-client](https://github.com/elricyu/memo-meeting-glasses-client)：眼镜会议记录应用。
+
+配套 [memo-meeting-glasses-client](https://github.com/elricyu/memo-meeting-glasses-client) 运行在 [OpenSource-Ai-Glasses](https://github.com/Iam5tillLearning/OpenSource-Ai-Glasses) 项目的 RV1106B 开源眼镜上。眼镜平台提供固件和 SDK，客户端负责采集与上传音频，本仓库提供后端与网页服务。
 
 浏览器录音可独立使用本服务；眼镜录音需要安装配套客户端。
 
